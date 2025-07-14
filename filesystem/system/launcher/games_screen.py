@@ -127,10 +127,9 @@ class GameInfo():
 
 # Tile in category row that uses GUI engine callbacks to launch games
 class GameLauncherTile(GUIBitmapButton2DNode):
-    def __init__(self, game_info, focused, on_tile_focused_cb, on_tiles_moved_cb):
+    def __init__(self, game_info, focused, on_tile_focused_cb):
         super().__init__(self)
         self.on_tile_focused_cb = on_tile_focused_cb
-        self.on_tiles_moved_cb = on_tiles_moved_cb
 
         self.focused = focused
         self.initial_focused = focused
@@ -157,7 +156,6 @@ class GameLauncherTile(GUIBitmapButton2DNode):
 
         # Setup tween for this tile for when rows are horizontally shifted
         self.tween = Tween()
-        self.tween.after = self.on_tiles_moved_cb
     
     # Only allow traversing up and down tiles in different rows
     # if they are centered in the y axis (needed for when getting
@@ -259,14 +257,14 @@ class GameCategory(EmptyNode):
 
         if new_tile_position.x > 0:
             self.index += 1
-            engine_io.gui_focused(False)    # Turn OFF GUI layer focus so you can't interrupt the tween
-            for tile in self.tiles:
-                tile.goto_x(tile.position.x-80)
+            # engine_io.gui_focused(False)    # Turn OFF GUI layer focus so you can't interrupt the tween
+            for i, tile in enumerate(self.tiles):
+                tile.goto_x((i - self.index) * 80.)
         elif new_tile_position.x < 0:
             self.index -= 1
-            engine_io.gui_focused(False)    # Turn OFF GUI layer focus so you can't interrupt the tween
-            for tile in self.tiles:
-                tile.goto_x(tile.position.x+80)
+            # engine_io.gui_focused(False)    # Turn OFF GUI layer focus so you can't interrupt the tween
+            for i, tile in enumerate(self.tiles):
+                tile.goto_x((i - self.index) * 80.)
         elif new_tile_global_position.y > 0:
             engine_io.gui_focused(False)    # Turn OFF GUI layer focus so you can't interrupt the tween
             self.shift_categories(-80)
@@ -293,7 +291,7 @@ class GameCategory(EmptyNode):
     def create_tiles(self):
         pos_x = 0
         for info in self.game_infos:
-            tile = GameLauncherTile(info, False, self.on_tile_focused_cb, self.after_tween_cb)
+            tile = GameLauncherTile(info, False, self.on_tile_focused_cb)
             self.add_child(tile)
             tile.position.x = pos_x
             self.tiles.append(tile)
