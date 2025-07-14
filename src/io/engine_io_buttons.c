@@ -62,6 +62,18 @@ uint32_t prev_tick_millis = MILLIS_NULL;
 // The reference time from which autorepeat is calculated. It is set when autorepeat occurs, and cleared when buttons are released.
 uint32_t autorepeat_base_millis = MILLIS_NULL;
 
+uint16_t engine_io_pressed_buttons() {
+    #if defined(__EMSCRIPTEN__)
+        return engine_io_web_pressed_buttons();
+    #elif defined(__unix__)
+        return engine_io_sdl_pressed_buttons();
+    #elif defined(__arm__)
+        return engine_io_rp3_pressed_buttons();
+    #else
+        #error unknown platform
+    #endif
+}
+
 void buttons_update_state() {
     // Clear the double-pressed state for released buttons.
     // Note that this is done at the beginning of the update function, so that clearing
@@ -74,13 +86,13 @@ void buttons_update_state() {
     prev_long_pressed_buttons = long_pressed_buttons;
 
     // Store the current state of the buttons in pressed_buttons.
-    #if defined(__EMSCRIPTEN__)
-        pressed_buttons = engine_io_web_pressed_buttons();
-    #elif defined(__unix__)
-        pressed_buttons = engine_io_sdl_pressed_buttons();
-    #elif defined(__arm__)
-        pressed_buttons = engine_io_rp3_pressed_buttons();
-    #endif
+    uint16_t raw_buttons = engine_io_pressed_buttons();
+    if(BUTTON_CODE_MENU & raw_buttons){
+        // overlay mode, persist previous button state, except MENU
+        pressed_buttons |= BUTTON_CODE_MENU;
+    } else {
+        pressed_buttons = raw_buttons;
+    }
 
     // Clear the assume-released state for any actually released button.
     assume_released_buttons &= pressed_buttons;

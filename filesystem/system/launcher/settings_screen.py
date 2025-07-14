@@ -52,7 +52,6 @@ class SettingsSlider(Rectangle2DNode):
         self.max = max
 
         self.setter_getter = setter_getter
-        self.percentage = self.setter_getter()
         
         self.scale_factor = 0.65
 
@@ -70,12 +69,13 @@ class SettingsSlider(Rectangle2DNode):
         self.icon.position.x = (-self.width/2) + (bitmap.width*self.scale_factor/2) + 1
 
         self.bar_max_width = self.width - (bitmap.width*self.scale_factor) - 6
-        self.bar = Rectangle2DNode(width=self.bar_max_width*self.percentage, height=self.height-14, inherit_scale=False, inherit_opacity=False, color=bar_color)
+        percentage = self.setter_getter()
+        self.bar = Rectangle2DNode(width=self.bar_max_width*percentage, height=self.height-14, inherit_scale=False, inherit_opacity=False, color=bar_color)
         self.position_bar()
 
         self.add_child(self.icon)
         self.add_child(self.bar)
-    
+
     def position_bar(self):
         self.bar.position.x =  -(self.width/2) + (self.icon.bitmap.width*self.scale_factor) + (self.bar.width/2) + 4
 
@@ -91,32 +91,33 @@ class SettingsSlider(Rectangle2DNode):
     def on_unfocus(self):
         self.color = setting_background_color
 
-    def update(self):
-        if self.percentage > self.max:
-            self.percentage = self.max
-        elif self.percentage < self.min:
-            self.percentage = self.min
+    def update_bar(self, percentage):
+        if percentage > self.max:
+            percentage = self.max
+        elif percentage < self.min:
+            percentage = self.min
 
-        self.bar.width = self.bar_max_width * self.percentage
+        self.bar.width = self.bar_max_width * percentage
         self.position_bar()
 
-        self.setter_getter(self.percentage, False)  # Do not save setting, just apply
+    def update(self, percentage):
+        self.update_bar(percentage)
+        self.setter_getter(percentage, False)  # Do not save setting, just apply
 
     def tick(self, dt):
         if self.icon.focused is not True:
+            self.update_bar(self.setter_getter())
             return
         
         if engine_io.LEFT.is_pressed:
-            self.percentage -= 0.025
-            self.update()
+            self.update(self.setter_getter() - 0.025)
         elif engine_io.RIGHT.is_pressed:
-            self.percentage += 0.025
-            self.update()
+            self.update(self.setter_getter() + 0.025)
         
         # Only save after one or the other button is done being held
         # (don't want to constantly write the file)
         if engine_io.LEFT.is_just_released or engine_io.RIGHT.is_just_released:
-            self.setter_getter(self.percentage, True)   # Actually save the setting
+            self.setter_getter(self.setter_getter(), True)   # Actually save the setting
         
 
 class SettingsScreen():
