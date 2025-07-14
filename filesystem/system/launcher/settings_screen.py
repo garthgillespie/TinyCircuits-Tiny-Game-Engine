@@ -151,10 +151,16 @@ class SettingsScreen():
         total_space= round(total_space_bytes/factor, 1)
         used_space  = round(used_space_bytes/factor, 1)
 
-        self.fs = Text2DNode(font=font, text=f"Storage: {used_space}/{total_space} {unit}", letter_spacing=0.75)
+        text = '\n'.join([
+            f"Storage: {used_space}/{total_space} {unit}",
+            f"Firmware:",
+            f"{engine.firmware_date()}",
+        ])
+
+        self.fs = Text2DNode(font=font, text=text, letter_spacing=0.75, line_spacing=2)
         self.fs.position.x = 128
         self.fs.position.y = 24
-    
+
     def tell_page(self, new_page):
         global page
         page = new_page
