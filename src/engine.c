@@ -157,6 +157,25 @@ static mp_obj_t engine_get_running_fps(){
 MP_DEFINE_CONST_FUN_OBJ_0(engine_get_running_fps_obj, engine_get_running_fps);
 
 
+static void reset(bool soft_reset){
+    // Do the reset depending on the platform
+    #if defined(__EMSCRIPTEN__)
+        exit(93);
+        (void)soft_reset;
+    #elif defined(__unix__)
+        exit(93);
+        (void)soft_reset;
+    #else
+        mp_obj_t machine_module = mp_import_name(MP_QSTR_machine, mp_const_none, MP_OBJ_NEW_SMALL_INT(0));
+
+        if(soft_reset){
+            mp_call_function_0(mp_load_attr(machine_module, MP_QSTR_soft_reset));
+        }else{
+            mp_call_function_0(mp_load_attr(machine_module, MP_QSTR_reset));
+        }
+    #endif
+}
+
 /* --- doc ---
    NAME: reset
    ID: engine_reset
@@ -176,23 +195,7 @@ static mp_obj_t engine_reset(size_t n_args, const mp_obj_t *args){
         }
     }
 
-    // Do the reset depending on the platform
-    #if defined(__EMSCRIPTEN__)
-        exit(93);
-        (void)soft_reset;
-    #elif defined(__unix__)
-        exit(93);
-        (void)soft_reset;
-    #else
-        mp_obj_t machine_module = mp_import_name(MP_QSTR_machine, mp_const_none, MP_OBJ_NEW_SMALL_INT(0));
-
-        if(soft_reset){
-            mp_call_function_0(mp_load_attr(machine_module, MP_QSTR_soft_reset));
-        }else{
-            mp_call_function_0(mp_load_attr(machine_module, MP_QSTR_reset));
-        }
-    #endif
-
+    reset(soft_reset);
     return mp_const_none;
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(engine_reset_obj, 0, 1, engine_reset);
@@ -242,6 +245,54 @@ static mp_obj_t engine_mp_time_to_next_tick(){
 }
 MP_DEFINE_CONST_FUN_OBJ_0(engine_time_to_next_tick_obj, engine_mp_time_to_next_tick);
 
+static void overlay_tick() {
+    static uint16_t last_pressed;
+    uint16_t pressed = engine_io_pressed_buttons();
+    uint16_t just_pressed = pressed & ~last_pressed;
+    last_pressed = pressed;
+
+    #define PRESSED(button) (button.code & pressed)
+    #define JUST_PRESSED(button) (button.code & just_pressed)
+
+    if(PRESSED(BUTTON_MENU)){
+        // soft reset
+        if(PRESSED(BUTTON_A)
+           && PRESSED(BUTTON_B)
+           && PRESSED(BUTTON_BUMPER_LEFT)
+           && PRESSED(BUTTON_BUMPER_RIGHT))
+        {
+            reset(true);
+        }
+
+        // settings
+        uint16_t dpad_codes = BUTTON_DPAD_LEFT.code | BUTTON_DPAD_RIGHT.code | BUTTON_DPAD_UP.code | BUTTON_DPAD_DOWN.code;
+        if(just_pressed & dpad_codes){
+            float volume = engine_audio_get_master_volume();
+            float bright = engine_display_get_brightness();
+
+            // volume
+            if(JUST_PRESSED(BUTTON_DPAD_DOWN)){
+                volume = max(volume - 0.1, 0);
+                engine_audio_apply_master_volume(volume);
+            }else if(JUST_PRESSED(BUTTON_DPAD_UP)){
+                volume = min(volume + 0.1, 1);
+                engine_audio_apply_master_volume(volume);
+            }
+
+            // brightness
+            if(JUST_PRESSED(BUTTON_DPAD_LEFT)){
+                bright = max(bright - 0.1, 0);
+                engine_display_apply_brightness(bright);
+            }else if(JUST_PRESSED(BUTTON_DPAD_RIGHT)){
+                bright = min(bright + 0.1, 1);
+                engine_display_apply_brightness(bright);
+            }
+
+            // update on disk
+            engine_main_settings_write(volume, bright);
+        }
+    }
+}
 
 bool engine_tick(){
     // Run this as often as possible
@@ -260,6 +311,8 @@ bool engine_tick(){
     }else{
         dt_ms = (float)millis_diff(now, engine_fps_time_at_last_tick_ms);
     }
+
+    overlay_tick();
 
     // Now that all the node callbacks were called and potentially moved
     // physics nodes around, step the physics engine another tick.

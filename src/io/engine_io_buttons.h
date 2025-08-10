@@ -50,6 +50,8 @@ extern button_class_obj_t BUTTON_BUMPER_RIGHT;
 extern button_class_obj_t BUTTON_MENU;
 
 
+uint16_t engine_io_pressed_buttons();
+
 void buttons_update_state();
 void button_update_state(button_class_obj_t *button, uint32_t now_millis, int32_t tick_time);
 
